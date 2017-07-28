@@ -1,6 +1,8 @@
 package binlog
 
-import "mysql"
+import (
+	"github.com/LightKool/mysql.go.v1"
+)
 
 type EventDecoder struct {
 	format *FormatDescriptionEvent

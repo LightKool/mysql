@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"mysql"
 	"time"
 
+	"github.com/LightKool/mysql.go.v1"
 	"github.com/juju/errors"
 )
 

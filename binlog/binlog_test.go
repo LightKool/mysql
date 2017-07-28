@@ -1,10 +1,10 @@
 package binlog
 
 import (
-	"mysql"
 	"os"
 	"testing"
 
+	"github.com/LightKool/mysql.go.v1"
 	"github.com/juju/errors"
 )
 

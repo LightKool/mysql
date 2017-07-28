@@ -4,7 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"mysql"
+
+	"github.com/LightKool/mysql.go.v1"
 )
 
 type TableMapEvent struct {
