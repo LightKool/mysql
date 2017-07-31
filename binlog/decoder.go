@@ -1,7 +1,7 @@
 package binlog
 
 import (
-	"github.com/LightKool/mysql.go.v1"
+	"github.com/LightKool/mysql-go"
 )
 
 type EventDecoder struct {
@@ -25,17 +25,17 @@ func (dec *EventDecoder) Decode(packet *mysql.Packet) (Event, error) {
 			packet, _ = packet.TrimRight(4)
 		}
 		switch header.Type {
-		case rotateEvent:
+		case RotateEventType:
 			ev = &RotateEvent{baseEvent: base}
-		case queryEvent:
+		case QueryEventType:
 			ev = &QueryEvent{baseEvent: base}
-		case xidEvent:
+		case XidEventType:
 			ev = &XIDEvent{baseEvent: base}
-		case rowsQueryEvent:
+		case RowsQueryEventType:
 			ev = &RowsQueryEvent{baseEvent: base}
-		case gtidEvent:
+		case GtidEventType:
 			ev = &GtidEvent{baseEvent: base}
-		case tableMapEvent:
+		case TableMapEventType:
 			ev = &TableMapEvent{baseEvent: base}
 		default:
 			ev = &UnsupportedEvent{baseEvent: base}

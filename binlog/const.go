@@ -5,126 +5,126 @@ type EventType byte
 // binlog event type constants
 // refer to https://github.com/mysql/mysql-server/blob/5.7/libbinlogevents/include/binlogEvent.h
 const (
-	unknownEvent EventType = iota
-	startEventV3
-	queryEvent
-	stopEvent
-	rotateEvent
-	intvarEvent
-	loadEvent
-	slaveEvent
-	createFileEvent
-	appendBlockEvent
-	execLoadEvent
-	deleteFileEvent
-	newLoadEvent
-	randEvent
-	userVarEvent
-	formatDescriptionEvent
-	xidEvent
-	beginLoadQueryEvent
-	executeLoadQueryEvent
-	tableMapEvent
-	preGaWriteRowsEvent
-	preGaUpdateRowsEvent
-	preGaDeleteRowsEvent
-	writeRowsEventV1
-	updateRowsEventV1
-	deleteRowsEventV1
-	incidentEvent
-	heartbeatEvent
-	ignorableEvent
-	rowsQueryEvent
-	writeRowsEventV2
-	updateRowsEventV2
-	deleteRowsEventV2
-	gtidEvent
-	anonymousGtidEvent
-	previousGtidsEvent
-	transactionContextEvent
-	viewChangeEvent
-	xaPrepareLogEvent
+	UnknownEventType EventType = iota
+	StartEventTypeV3
+	QueryEventType
+	StopEventType
+	RotateEventType
+	IntvarEventType
+	LoadEventType
+	SlaveEventType
+	CreateFileEventType
+	AppendBlockEventType
+	ExecLoadEventType
+	DeleteFileEventType
+	NewLoadEventType
+	RandEventType
+	UserVarEventType
+	FormatDescriptionEventType
+	XidEventType
+	BeginLoadQueryEventType
+	ExecuteLoadQueryEventType
+	TableMapEventType
+	PreGaWriteRowsEventType
+	PreGaUpdateRowsEventType
+	PreGaDeleteRowsEventType
+	WriteRowsEventTypeV1
+	UpdateRowsEventTypeV1
+	DeleteRowsEventTypeV1
+	IncidentEventType
+	HeartbeatEventType
+	IgnorableEventType
+	RowsQueryEventType
+	WriteRowsEventTypeV2
+	UpdateRowsEventTypeV2
+	DeleteRowsEventTypeV2
+	GtidEventType
+	AnonymousGtidEventType
+	PreviousGtidsEventType
+	TransactionContextEventType
+	ViewChangeEventType
+	XaPrepareLogEventType
 )
 
 func (t EventType) String() string {
 	switch t {
-	case unknownEvent:
+	case UnknownEventType:
 		return "UnknownEvent"
-	case startEventV3:
+	case StartEventTypeV3:
 		return "StartEventV3"
-	case queryEvent:
+	case QueryEventType:
 		return "QueryEvent"
-	case stopEvent:
+	case StopEventType:
 		return "StopEvent"
-	case rotateEvent:
+	case RotateEventType:
 		return "RotateEvent"
-	case intvarEvent:
+	case IntvarEventType:
 		return "IntvarEvent"
-	case loadEvent:
+	case LoadEventType:
 		return "LoadEvent"
-	case slaveEvent:
+	case SlaveEventType:
 		return "SlaveEvent"
-	case createFileEvent:
+	case CreateFileEventType:
 		return "CreateFileEvent"
-	case appendBlockEvent:
+	case AppendBlockEventType:
 		return "AppendBlockEvent"
-	case execLoadEvent:
+	case ExecLoadEventType:
 		return "ExecLoadEvent"
-	case deleteFileEvent:
+	case DeleteFileEventType:
 		return "DeleteFileEvent"
-	case newLoadEvent:
+	case NewLoadEventType:
 		return "NewLoadEvent"
-	case randEvent:
+	case RandEventType:
 		return "RandEvent"
-	case userVarEvent:
+	case UserVarEventType:
 		return "UserVarEvent"
-	case formatDescriptionEvent:
+	case FormatDescriptionEventType:
 		return "FormatDescriptionEvent"
-	case xidEvent:
+	case XidEventType:
 		return "XidEvent"
-	case beginLoadQueryEvent:
+	case BeginLoadQueryEventType:
 		return "BeginLoadQueryEvent"
-	case executeLoadQueryEvent:
+	case ExecuteLoadQueryEventType:
 		return "ExecuteLoadQueryEvent"
-	case tableMapEvent:
+	case TableMapEventType:
 		return "TableMapEvent"
-	case preGaWriteRowsEvent:
+	case PreGaWriteRowsEventType:
 		return "PreGaWriteRowsEvent"
-	case preGaUpdateRowsEvent:
+	case PreGaUpdateRowsEventType:
 		return "PreGaUpdateRowsEvent"
-	case preGaDeleteRowsEvent:
+	case PreGaDeleteRowsEventType:
 		return "PreGaDeleteRowsEvent"
-	case writeRowsEventV1:
+	case WriteRowsEventTypeV1:
 		return "WriteRowsEventV1"
-	case updateRowsEventV1:
+	case UpdateRowsEventTypeV1:
 		return "UpdateRowsEventV1"
-	case deleteRowsEventV1:
+	case DeleteRowsEventTypeV1:
 		return "DeleteRowsEventV1"
-	case incidentEvent:
+	case IncidentEventType:
 		return "IncidentEvent"
-	case heartbeatEvent:
+	case HeartbeatEventType:
 		return "HeartbeatEvent"
-	case ignorableEvent:
+	case IgnorableEventType:
 		return "IgnorableEvent"
-	case rowsQueryEvent:
+	case RowsQueryEventType:
 		return "RowsQueryEvent"
-	case writeRowsEventV2:
+	case WriteRowsEventTypeV2:
 		return "WriteRowsEventV2"
-	case updateRowsEventV2:
+	case UpdateRowsEventTypeV2:
 		return "UpdateRowsEventV2"
-	case deleteRowsEventV2:
+	case DeleteRowsEventTypeV2:
 		return "DeleteRowsEventV2"
-	case gtidEvent:
+	case GtidEventType:
 		return "GtidEvent"
-	case anonymousGtidEvent:
+	case AnonymousGtidEventType:
 		return "AnonymousGtidEvent"
-	case previousGtidsEvent:
+	case PreviousGtidsEventType:
 		return "PreviousGtidsEvent"
-	case transactionContextEvent:
+	case TransactionContextEventType:
 		return "TransactionContextEvent"
-	case viewChangeEvent:
+	case ViewChangeEventType:
 		return "ViewChangeEvent"
-	case xaPrepareLogEvent:
+	case XaPrepareLogEventType:
 		return "XaPrepareLogEvent"
 	default:
 		return "UnknownEvent"

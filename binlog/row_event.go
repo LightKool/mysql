@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/LightKool/mysql.go.v1"
+	"github.com/LightKool/mysql-go"
 )
 
 type TableMapEvent struct {

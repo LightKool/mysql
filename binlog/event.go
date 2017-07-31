@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/LightKool/mysql.go.v1"
+	"github.com/LightKool/mysql-go"
 	"github.com/juju/errors"
 )
 
