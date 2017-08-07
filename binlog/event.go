@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/LightKool/mysql-go"
+	mysql "github.com/LightKool/mysql-go"
 	"github.com/juju/errors"
 )
 
@@ -16,7 +16,19 @@ const (
 	dateTimeFormat  = "2006-01-02 15:04:05"
 )
 
+// Event interface
+type Event interface {
+	// Header returns the header part of this event.
+	Header() *EventHeader
+	// Decode does the actual decoding job of this event.
+	Decode(*EventDecoder) error
+	// Print output formatted representation of this event.
+	Print(io.Writer)
+}
+
 type EventHeader struct {
+	packet *mysql.Packet
+
 	Timestamp  uint32
 	Type       EventType
 	ServerID   uint32
@@ -25,32 +37,25 @@ type EventHeader struct {
 	Flags      uint16
 }
 
-func (h *EventHeader) Decode(packet *mysql.Packet) error {
+func (h *EventHeader) Decode(dec *EventDecoder) error {
+	packet := h.packet
 	if packet.Len() < eventHeaderSize {
 		return errors.Errorf("event header size %d too short, expect %d", packet.Len(), eventHeaderSize)
 	}
-
 	h.Timestamp = packet.ReadUint32()
-	h.Type = EventType(packet.ReadByte())
+	h.Type = EventType(packet.Read(1)[0])
 	h.ServerID = packet.ReadUint32()
 	h.EventSize = packet.ReadUint32()
 	h.NextLogPos = packet.ReadUint32()
 	h.Flags = packet.ReadUint16()
-
 	if packet.Len() != int(h.EventSize) {
 		return errors.Errorf("header event size: %d != actual event size: %d, maybe corrupted", h.EventSize, packet.Len())
 	}
+	// remove checksum part if the event type is not FormatDescriptionEventType
+	if h.Type != FormatDescriptionEventType && dec.format != nil && dec.format.checksumEnabled() {
+		h.packet.SliceRight(4)
+	}
 	return nil
-}
-
-func (h *EventHeader) DecodeEvent(packet *mysql.Packet) (Event, error) {
-	return nil, nil
-}
-
-type Event interface {
-	Header() *EventHeader
-	Decode(*mysql.Packet) error
-	Print(w io.Writer)
 }
 
 type baseEvent struct {
@@ -61,7 +66,7 @@ func (e *baseEvent) Header() *EventHeader {
 	return e.header
 }
 
-func (e *baseEvent) PrintHeader(w io.Writer) {
+func (e *baseEvent) printHeader(w io.Writer) {
 	fmt.Fprintf(w, "=== %s ===\n", e.header.Type)
 	fmt.Fprintf(w, "Date: %s\n", time.Unix(int64(e.header.Timestamp), 0).Format(dateTimeFormat))
 	fmt.Fprintf(w, "Log position: %d\n", e.header.NextLogPos)
@@ -73,13 +78,14 @@ type UnsupportedEvent struct {
 	data []byte
 }
 
-func (e *UnsupportedEvent) Decode(packet *mysql.Packet) error {
-	e.data = packet.Raw()
+func (e *UnsupportedEvent) Decode(dec *EventDecoder) error {
+	packet := e.header.packet
+	e.data = packet.ReadRemaining()
 	return nil
 }
 
 func (e *UnsupportedEvent) Print(w io.Writer) {
-	e.PrintHeader(w)
+	e.printHeader(w)
 	fmt.Fprintf(w, "Data:\n%s\n", hex.Dump(e.data))
 	fmt.Fprintln(w)
 }
@@ -90,14 +96,15 @@ type RotateEvent struct {
 	NextLogName []byte
 }
 
-func (e *RotateEvent) Decode(packet *mysql.Packet) error {
+func (e *RotateEvent) Decode(dec *EventDecoder) error {
+	packet := e.header.packet
 	e.Position = packet.ReadUint64()
 	e.NextLogName = packet.ReadRemaining()
 	return nil
 }
 
 func (e *RotateEvent) Print(w io.Writer) {
-	e.PrintHeader(w)
+	e.printHeader(w)
 	fmt.Fprintf(w, "Position: %d\n", e.Position)
 	fmt.Fprintf(w, "Next log name: %s\n", e.NextLogName)
 	fmt.Fprintln(w)
@@ -117,14 +124,14 @@ type FormatDescriptionEvent struct {
 	checksumAlg byte
 }
 
-func (e *FormatDescriptionEvent) Decode(packet *mysql.Packet) error {
+func (e *FormatDescriptionEvent) Decode(dec *EventDecoder) error {
+	packet := e.header.packet
 	e.BinlogVersion = packet.ReadUint16()
 	e.ServerVersion = bytes.Trim(packet.Read(50), "\x00")
-	packet.Advance(4)
-	e.EventHeaderLength = packet.ReadByte()
+	packet.Skip(4)
+	e.EventHeaderLength = packet.Read(1)[0]
 	if parseMysqlVersion(string(e.ServerVersion)).greaterOrEqual(checksumEnabledMysqlVersion) {
-		var checksumPart []byte
-		packet, checksumPart = packet.TrimRight(5)
+		checksumPart := packet.SliceRight(5)
 		e.checksumAlg = checksumPart[0]
 	}
 	e.EventPostHeaderLengths = packet.ReadRemaining()
@@ -132,7 +139,7 @@ func (e *FormatDescriptionEvent) Decode(packet *mysql.Packet) error {
 }
 
 func (e *FormatDescriptionEvent) Print(w io.Writer) {
-	e.PrintHeader(w)
+	e.printHeader(w)
 	fmt.Fprintf(w, "Binlog Version: %d\n", e.BinlogVersion)
 	fmt.Fprintf(w, "Server version: %s\n", e.ServerVersion)
 	e.printEventPostHeaderLengths(w)
@@ -160,21 +167,22 @@ type QueryEvent struct {
 	Query         []byte
 }
 
-func (e *QueryEvent) Decode(packet *mysql.Packet) error {
+func (e *QueryEvent) Decode(dec *EventDecoder) error {
+	packet := e.header.packet
 	e.ThreadID = packet.ReadUint32()
 	e.ExecutionTime = packet.ReadUint32()
-	databaseLen := packet.ReadByte()
+	databaseLen := packet.Read(1)[0]
 	e.ErrorCode = packet.ReadUint16()
 	statusVarsLen := packet.ReadUint16()
 	e.StatusVars = packet.Read(int(statusVarsLen))
 	e.Database = packet.Read(int(databaseLen))
-	packet.Advance(1)
+	packet.Skip(1)
 	e.Query = packet.ReadRemaining()
 	return nil
 }
 
 func (e *QueryEvent) Print(w io.Writer) {
-	e.PrintHeader(w)
+	e.printHeader(w)
 	fmt.Fprintf(w, "Thread ID: %d\n", e.ThreadID)
 	fmt.Fprintf(w, "Execution time: %d\n", e.ExecutionTime)
 	fmt.Fprintf(w, "Error code: %d\n", e.ErrorCode)
@@ -188,13 +196,14 @@ type XIDEvent struct {
 	TransactionID uint64
 }
 
-func (e *XIDEvent) Decode(packet *mysql.Packet) error {
+func (e *XIDEvent) Decode(dec *EventDecoder) error {
+	packet := e.header.packet
 	e.TransactionID = packet.ReadUint64()
 	return nil
 }
 
 func (e *XIDEvent) Print(w io.Writer) {
-	e.PrintHeader(w)
+	e.printHeader(w)
 	fmt.Fprintf(w, "TransactionID: %d\n", e.TransactionID)
 	fmt.Fprintln(w)
 }
@@ -206,15 +215,16 @@ type GtidEvent struct {
 	gno        uint64
 }
 
-func (e *GtidEvent) Decode(packet *mysql.Packet) error {
-	e.CommitFlag = packet.ReadByte()
+func (e *GtidEvent) Decode(dec *EventDecoder) error {
+	packet := e.header.packet
+	e.CommitFlag = packet.Read(1)[0]
 	e.sid = packet.Read(16)
 	e.gno = packet.ReadUint64()
 	return nil
 }
 
 func (e *GtidEvent) Print(w io.Writer) {
-	e.PrintHeader(w)
+	e.printHeader(w)
 	fmt.Fprintf(w, "Commit flag: %d\n", e.CommitFlag)
 	fmt.Fprintf(w, "GTID: %s\n", e.GTID())
 	fmt.Fprintln(w)

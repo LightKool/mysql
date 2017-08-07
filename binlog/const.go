@@ -130,3 +130,40 @@ func (t EventType) String() string {
 		return "UnknownEvent"
 	}
 }
+
+const (
+	fieldTypeDecimal byte = iota
+	fieldTypeTiny
+	fieldTypeShort
+	fieldTypeLong
+	fieldTypeFloat
+	fieldTypeDouble
+	fieldTypeNULL
+	fieldTypeTimestamp
+	fieldTypeLongLong
+	fieldTypeInt24
+	fieldTypeDate
+	fieldTypeTime
+	fieldTypeDateTime
+	fieldTypeYear
+	fieldTypeNewDate
+	fieldTypeVarChar
+	fieldTypeBit
+	// extra field types included in the binlog
+	fieldTypeTimestampV2
+	fieldTypeDateTimeV2
+	fieldTypeTimeV2
+)
+const (
+	fieldTypeJSON byte = iota + 0xf5
+	fieldTypeNewDecimal
+	fieldTypeEnum
+	fieldTypeSet
+	fieldTypeTinyBLOB
+	fieldTypeMediumBLOB
+	fieldTypeLongBLOB
+	fieldTypeBLOB
+	fieldTypeVarString
+	fieldTypeString
+	fieldTypeGeometry
+)

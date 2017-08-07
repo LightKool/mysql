@@ -25,3 +25,7 @@ func parseMysqlVersion(version string) *mysqlVersion {
 func (v *mysqlVersion) greaterOrEqual(other *mysqlVersion) bool {
 	return (v.x<<16 | v.y<<8 | v.z) >= (other.x<<16 | other.y<<8 | other.z)
 }
+
+func isBitSet(bitmap []byte, i int) bool {
+	return bitmap[i>>3]&(1<<(uint(i)&7)) > 0
+}
