@@ -7,7 +7,6 @@ import (
 	"io"
 	"time"
 
-	mysql "github.com/LightKool/mysql-go"
 	"github.com/juju/errors"
 )
 
@@ -27,7 +26,7 @@ type Event interface {
 }
 
 type EventHeader struct {
-	packet *mysql.Packet
+	packet *binlogPacket
 
 	Timestamp  uint32
 	Type       EventType
@@ -42,12 +41,12 @@ func (h *EventHeader) Decode(dec *EventDecoder) error {
 	if packet.Len() < eventHeaderSize {
 		return errors.Errorf("event header size %d too short, expect %d", packet.Len(), eventHeaderSize)
 	}
-	h.Timestamp = packet.ReadUint32()
-	h.Type = EventType(packet.Read(1)[0])
-	h.ServerID = packet.ReadUint32()
-	h.EventSize = packet.ReadUint32()
-	h.NextLogPos = packet.ReadUint32()
-	h.Flags = packet.ReadUint16()
+	h.Timestamp = packet.readUint32()
+	h.Type = EventType(packet.readByte())
+	h.ServerID = packet.readUint32()
+	h.EventSize = packet.readUint32()
+	h.NextLogPos = packet.readUint32()
+	h.Flags = packet.readUint16()
 	if packet.Len() != int(h.EventSize) {
 		return errors.Errorf("header event size: %d != actual event size: %d, maybe corrupted", h.EventSize, packet.Len())
 	}
@@ -80,7 +79,7 @@ type UnsupportedEvent struct {
 
 func (e *UnsupportedEvent) Decode(dec *EventDecoder) error {
 	packet := e.header.packet
-	e.data = packet.ReadRemaining()
+	e.data = packet.Read(-1)
 	return nil
 }
 
@@ -98,8 +97,8 @@ type RotateEvent struct {
 
 func (e *RotateEvent) Decode(dec *EventDecoder) error {
 	packet := e.header.packet
-	e.Position = packet.ReadUint64()
-	e.NextLogName = packet.ReadRemaining()
+	e.Position = packet.readUint64()
+	e.NextLogName = packet.Read(-1)
 	return nil
 }
 
@@ -126,15 +125,15 @@ type FormatDescriptionEvent struct {
 
 func (e *FormatDescriptionEvent) Decode(dec *EventDecoder) error {
 	packet := e.header.packet
-	e.BinlogVersion = packet.ReadUint16()
+	e.BinlogVersion = packet.readUint16()
 	e.ServerVersion = bytes.Trim(packet.Read(50), "\x00")
 	packet.Skip(4)
-	e.EventHeaderLength = packet.Read(1)[0]
+	e.EventHeaderLength = packet.readByte()
 	if parseMysqlVersion(string(e.ServerVersion)).greaterOrEqual(checksumEnabledMysqlVersion) {
 		checksumPart := packet.SliceRight(5)
 		e.checksumAlg = checksumPart[0]
 	}
-	e.EventPostHeaderLengths = packet.ReadRemaining()
+	e.EventPostHeaderLengths = packet.Read(-1)
 	return nil
 }
 
@@ -169,15 +168,15 @@ type QueryEvent struct {
 
 func (e *QueryEvent) Decode(dec *EventDecoder) error {
 	packet := e.header.packet
-	e.ThreadID = packet.ReadUint32()
-	e.ExecutionTime = packet.ReadUint32()
-	databaseLen := packet.Read(1)[0]
-	e.ErrorCode = packet.ReadUint16()
-	statusVarsLen := packet.ReadUint16()
+	e.ThreadID = packet.readUint32()
+	e.ExecutionTime = packet.readUint32()
+	databaseLen := packet.readByte()
+	e.ErrorCode = packet.readUint16()
+	statusVarsLen := packet.readUint16()
 	e.StatusVars = packet.Read(int(statusVarsLen))
 	e.Database = packet.Read(int(databaseLen))
 	packet.Skip(1)
-	e.Query = packet.ReadRemaining()
+	e.Query = packet.Read(-1)
 	return nil
 }
 
@@ -198,7 +197,7 @@ type XIDEvent struct {
 
 func (e *XIDEvent) Decode(dec *EventDecoder) error {
 	packet := e.header.packet
-	e.TransactionID = packet.ReadUint64()
+	e.TransactionID = packet.readUint64()
 	return nil
 }
 
@@ -217,9 +216,9 @@ type GtidEvent struct {
 
 func (e *GtidEvent) Decode(dec *EventDecoder) error {
 	packet := e.header.packet
-	e.CommitFlag = packet.Read(1)[0]
+	e.CommitFlag = packet.readByte()
 	e.sid = packet.Read(16)
-	e.gno = packet.ReadUint64()
+	e.gno = packet.readUint64()
 	return nil
 }
 

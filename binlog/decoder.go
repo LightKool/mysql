@@ -10,7 +10,7 @@ type EventDecoder struct {
 }
 
 func (dec *EventDecoder) Decode(packet *mysql.Packet) (Event, error) {
-	header := &EventHeader{packet: packet}
+	header := &EventHeader{packet: newBinlogPacket(packet)}
 	err := header.Decode(dec)
 	if err != nil {
 		return nil, err

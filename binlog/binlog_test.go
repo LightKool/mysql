@@ -1,7 +1,6 @@
 package binlog
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -12,7 +11,7 @@ import (
 func TestDriver(t *testing.T) {
 	driver := &mysql.MySQLDriver{}
 	dsn := "root:abcd1234@tcp(10.17.5.91:3306)/user_mon"
-	wr, _ := mysql.NewMysqlConnWrapper(driver)
+	wr, _ := mysql.NewConnWrapper(driver)
 	err := wr.Connect(dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -50,8 +49,6 @@ func TestDriver(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		fmt.Printf("%+v\n", dec.tables[3809])
 
 		// if e, ok := ev.(*WriteRowsEvent); ok {
 		// 	if string(e.Table.TableName) == "TB_USER" {

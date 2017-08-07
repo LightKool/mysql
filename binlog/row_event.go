@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/LightKool/mysql-go"
 )
 
 type TableMapEvent struct {
@@ -25,25 +23,25 @@ func (e *TableMapEvent) Decode(dec *EventDecoder) error {
 	packet := e.header.packet
 	data := append(packet.Read(6), 0, 0)
 	e.TableID = binary.LittleEndian.Uint64(data)
-	e.Flags = packet.ReadUint16()
+	e.Flags = packet.readUint16()
 
-	databaseLen := packet.Read(1)[0]
+	databaseLen := packet.readByte()
 	e.Database = packet.Read(int(databaseLen))
 	packet.Skip(1)
 
-	tableLen := packet.Read(1)[0]
+	tableLen := packet.readByte()
 	e.TableName = packet.Read(int(tableLen))
 	packet.Skip(1)
 
 	e.ColumnCount = packet.ReadPackedInteger()
 	e.ColumnTypes = packet.Read(int(e.ColumnCount))
 
-	columnMeta, err := packet.ReadTableColumnMeta(e.ColumnTypes)
+	columnMeta, err := packet.readTableColumnMeta(e.ColumnTypes)
 	if err != nil {
 		return err
 	}
 	e.ColumnMeta = columnMeta
-	e.ColumnNullability = packet.ReadRemaining()
+	e.ColumnNullability = packet.Read(-1)
 	if len(e.ColumnNullability) != int(e.ColumnCount+7)>>3 {
 		return io.ErrUnexpectedEOF
 	}
@@ -73,7 +71,7 @@ type RowsQueryEvent struct {
 func (e *RowsQueryEvent) Decode(dec *EventDecoder) error {
 	packet := e.header.packet
 	packet.Skip(1)
-	e.Query = packet.ReadRemaining()
+	e.Query = packet.Read(-1)
 	return nil
 }
 
@@ -95,12 +93,12 @@ type rowsEvent struct {
 	parseTime bool
 }
 
-func (e *rowsEvent) decodePartial(packet *mysql.Packet) {
+func (e *rowsEvent) decodePartial(packet *binlogPacket) {
 	tableID := append(packet.Read(6), 0x00, 0x00)
 	e.TableID = binary.LittleEndian.Uint64(tableID)
-	e.Flags = packet.ReadUint16() // reserved
+	e.Flags = packet.readUint16() // reserved
 
-	extraDataLen := packet.ReadUint16()
+	extraDataLen := packet.readUint16()
 	e.ExtraData = packet.Read(int(extraDataLen) - 2)
 
 	e.ColumnCount = packet.ReadPackedInteger()
@@ -117,7 +115,7 @@ func (e *rowsEvent) printPartial(w io.Writer) {
 	fmt.Fprintf(w, "Column types: \n%v\n", e.Table.ColumnTypes)
 }
 
-func (e *rowsEvent) decodeOneRow(packet *mysql.Packet, includedColumns []byte) (err error) {
+func (e *rowsEvent) decodeOneRow(packet *binlogPacket, includedColumns []byte) (err error) {
 	var includedColumnsCount int
 	for i := 0; i < int(e.ColumnCount); i++ {
 		if isBitSet(includedColumns, i) {
@@ -134,7 +132,7 @@ func (e *rowsEvent) decodeOneRow(packet *mysql.Packet, includedColumns []byte) (
 		}
 		index = i - skipped
 		if !isBitSet(nullColumns, index) {
-			row[index], err = packet.ReadTableColumnValue(e.Table.ColumnTypes[i], e.Table.ColumnMeta[i], false)
+			row[index], err = packet.readTableColumnValue(e.Table.ColumnTypes[i], e.Table.ColumnMeta[i], false)
 			if err != nil {
 				return
 			}
