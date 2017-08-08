@@ -143,13 +143,9 @@ func (p *binlogPacket) readTableColumnValue(columnType byte, meta uint16, unsign
 		v = fmt.Sprintf("%04d-%02d-%02d", u32>>9, (u32>>5)%16, u32%32)
 	case fieldTypeTime:
 		u32 := uint32(p.ReadUintBySize(3))
-		if u32 == 0 {
-			v = "00:00:00"
-		} else {
-			v = fmt.Sprintf("%02d:%02d:%02d", u32/10000, (u32%10000)/100, u32%100)
-		}
+		v = fmt.Sprintf("%02d:%02d:%02d", u32/10000, (u32%10000)/100, u32%100)
 	case fieldTypeTimeV2:
-		// v = p.readTimeV2(meta)
+		v = p.readTimeV2(meta)
 	case fieldTypeDateTime:
 		// a number like YYYYMMDDhhmmss
 		u64 := p.readUint64()
@@ -159,16 +155,11 @@ func (p *binlogPacket) readTableColumnValue(columnType byte, meta uint16, unsign
 	case fieldTypeDateTimeV2:
 		v = p.readDateTimeV2(meta)
 	case fieldTypeTimestamp:
-		u32 := p.readUint32()
-		v = time.Unix(int64(u32), 0).UnixNano()
+		v = time.Unix(int64(p.readUint32()), 0).UnixNano()
 	case fieldTypeTimestampV2:
-		sec := int64(binary.BigEndian.Uint32(p.Read(4)))
-		msec := p.readFractionalSeconds(int(meta))
-		if sec == 0 {
-			v = sec
-		} else {
-			v = time.Unix(sec, msec*1000).UnixNano()
-		}
+		sec := int64(p.ReadUintBySizeBE(4))
+		msec := p.readMicroSeconds(int(meta), false)
+		v = time.Unix(sec, msec*1000).UnixNano()
 	case fieldTypeVarChar, fieldTypeVarString:
 		length = int(meta)
 		fallthrough
@@ -247,15 +238,50 @@ func (p *binlogPacket) readNewDecimal(meta uint16) (float64, error) {
 	return strconv.ParseFloat(buf.String(), 64)
 }
 
-func (p *binlogPacket) readFractionalSeconds(dec int) int64 {
+// readMicroSeconds reads fractional part of MySQL timestamp/datetime/time fields
+func (p *binlogPacket) readMicroSeconds(dec int, negative bool) int64 {
 	// dec is in the range(0,6)
-	fracLen := (dec + 1) / 2
-	var frac int64
-	if fracLen > 0 {
-		frac = int64(p.ReadUintBySizeBE(fracLen))
-		frac *= int64(math.Pow(100, float64(3-fracLen)))
+	msecLen := (dec + 1) / 2
+	var msec int64
+	msec = int64(p.ReadUintBySizeBE(msecLen))
+	if msec != 0 {
+		if negative {
+			msec -= int64(math.Pow(0x100, float64(msecLen)))
+		}
+		msec *= int64(math.Pow(100, float64(3-msecLen)))
 	}
-	return frac
+	return msec
+}
+
+func (p *binlogPacket) readDateTimeV2(meta uint16) (v string) {
+	/*
+	    1 bit  sign            (1 = positive, 0 = negative ignored) the negative value of a datetime doesn't make much sense
+	   17 bits year*13+month   (year 0-9999, month 0-12)
+	    5 bits day             (0-31)
+	    5 bits hour            (0-23)
+	    6 bits minute          (0-59)
+	    6 bits second          (0-59)
+	   24 bits microseconds    (0-999999)
+
+	   Total: 64 bits = 8 bytes
+
+	   SYYYYYYY.YYYYYYYY.YYdddddh.hhhhmmmm.mmssssss.ffffffff.ffffffff.ffffffff
+	*/
+	datetime := p.ReadUintBySizeBE(5)
+	dec := int(meta)
+	msec := p.readMicroSeconds(dec, false)
+
+	yearmonth := datetime >> (40 - 1 - 17) & (1<<17 - 1)
+	year := yearmonth / 13
+	month := yearmonth % 13
+	day := datetime >> (40 - 18 - 5) & (1<<5 - 1)
+	hour := datetime >> (40 - 23 - 5) & (1<<5 - 1)
+	minute := datetime >> (40 - 28 - 6) & (1<<6 - 1)
+	sec := datetime >> (40 - 34 - 6) & (1<<6 - 1)
+
+	v = fmt.Sprintf("%04d-%02d-%02d %02d:%02d:%02d.%06d", year, month, day, hour, minute, sec, msec)
+	v = v[0 : len(v)-6+dec]
+	return
 }
 
 func (p *binlogPacket) readTimeV2(meta uint16) (v string) {
@@ -270,51 +296,28 @@ func (p *binlogPacket) readTimeV2(meta uint16) (v string) {
 
 	   + fractional-seconds storage (size depends on meta)
 	*/
-	data := p.Read(3)
-	negative := data[0]&0x80 == 0
-	time := binary.BigEndian.Uint32(append([]byte{0x00}, data...))
+	time := int64(p.ReadUintBySizeBE(3)) - 0x800000
+	negative := time < 0
+	dec := int(meta)
+	msec := p.readMicroSeconds(dec, negative)
+
+	var sign string
 	if negative {
-		time ^= 0xFFFFFF
+		if msec != 0 {
+			time++
+		}
+		time = time<<24 + msec
+		time = -time
+		msec = time % (1 << 24)
+		time = time >> 24
+		sign = "-"
 	}
 
 	hour := time >> (24 - 2 - 10) & (1<<10 - 1)
 	minute := time >> (24 - 12 - 6) & (1<<6 - 1)
 	sec := time >> (24 - 18 - 6) & (1<<6 - 1)
 
-	v = fmt.Sprintf("%02d:%02d:%02d", hour, minute, sec)
-	return
-}
-
-func (p *binlogPacket) readDateTimeV2(meta uint16) (v string) {
-	/*
-	    1 bit  sign            (1 = positive, 0 = negative) could be ignored
-	   17 bits year*13+month   (year 0-9999, month 0-12)
-	    5 bits day             (0-31)
-	    5 bits hour            (0-23)
-	    6 bits minute          (0-59)
-	    6 bits second          (0-59)
-	   24 bits microseconds    (0-999999)
-
-	   Total: 64 bits = 8 bytes
-
-	   SYYYYYYY.YYYYYYYY.YYdddddh.hhhhmmmm.mmssssss.ffffffff.ffffffff.ffffffff
-	*/
-	datetime := p.ReadUintBySizeBE(5)
-	yearmonth := datetime >> (40 - 1 - 17) & (1<<17 - 1)
-	year := yearmonth / 13
-	month := yearmonth % 13
-	day := datetime >> (40 - 18 - 5) & (1<<5 - 1)
-	hour := datetime >> (40 - 23 - 5) & (1<<5 - 1)
-	minute := datetime >> (40 - 28 - 6) & (1<<6 - 1)
-	sec := datetime >> (40 - 34 - 6) & (1<<6 - 1)
-
-	dec := int(meta)
-	frac := p.readFractionalSeconds(dec)
-	if frac == 0 {
-		v = fmt.Sprintf("%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, sec)
-	} else {
-		v = fmt.Sprintf("%04d-%02d-%02d %02d:%02d:%02d.%06d", year, month, day, hour, minute, sec, frac)
-		v = v[0 : len(v)-dec]
-	}
+	v = fmt.Sprintf("%s%02d:%02d:%02d.%06d", sign, hour, minute, sec, msec)
+	v = v[0 : len(v)-6+dec]
 	return
 }

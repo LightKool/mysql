@@ -85,13 +85,13 @@ func (p *Packet) ReadUintBySizeBE(size int) (u uint64) {
 		u = uint64(binary.BigEndian.Uint16(p.data[p.pos:]))
 	case size >= 3 && size <= 4:
 		var u32 uint32
-		for i := size - 1; i >= 0; i-- {
-			u32 |= uint32(p.data[p.pos+i]) << (uint(i) * 8)
+		for i := 0; i < size; i++ {
+			u32 |= uint32(p.data[p.pos+i]) << (uint(size-i-1) * 8)
 		}
 		u = uint64(u32)
 	case size >= 5 && size <= 8:
-		for i := size - 1; i >= 0; i-- {
-			u |= uint64(p.data[p.pos+i]) << (uint(i) * 8)
+		for i := 0; i < size; i++ {
+			u |= uint64(p.data[p.pos+i]) << (uint(size-i-1) * 8)
 		}
 	default:
 		panic("size must be between 0 and 8")
