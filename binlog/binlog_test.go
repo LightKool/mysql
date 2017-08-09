@@ -32,7 +32,7 @@ func TestDriver(t *testing.T) {
 		t.Fatal(err)
 	}
 	// err = wr.WriteBinlogDumpCommand(123, "mysql-bin.000004", 4)
-	err = wr.WriteBinlogDumpCommand(123, "mysql-bin.000004", 772972259)
+	err = wr.WriteBinlogDumpCommand(123, "mysql-bin.000005", 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,17 +45,14 @@ func TestDriver(t *testing.T) {
 			t.Fatal(errors.Trace(err))
 		}
 
-		ev, err := dec.Decode(packet)
+		ev, err := dec.decode(packet)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		// if e, ok := ev.(*WriteRowsEvent); ok {
-		// 	if string(e.Table.TableName) == "TB_USER" {
-		ev.Print(os.Stdout)
-		// 		break
-		// 	}
-		// }
+		if ev.Header().Type == QueryEventType {
+			ev.Print(os.Stdout)
+		}
 	}
 }
 

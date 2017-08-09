@@ -28,16 +28,16 @@ const (
 	PreGaWriteRowsEventType
 	PreGaUpdateRowsEventType
 	PreGaDeleteRowsEventType
-	WriteRowsEventTypeV1
-	UpdateRowsEventTypeV1
-	DeleteRowsEventTypeV1
+	OldWriteRowsEventType
+	OldUpdateRowsEventType
+	OldDeleteRowsEventType
 	IncidentEventType
 	HeartbeatEventType
 	IgnorableEventType
 	RowsQueryEventType
-	WriteRowsEventTypeV2
-	UpdateRowsEventTypeV2
-	DeleteRowsEventTypeV2
+	WriteRowsEventType
+	UpdateRowsEventType
+	DeleteRowsEventType
 	GtidEventType
 	AnonymousGtidEventType
 	PreviousGtidsEventType
@@ -94,11 +94,11 @@ func (t EventType) String() string {
 		return "PreGaUpdateRowsEvent"
 	case PreGaDeleteRowsEventType:
 		return "PreGaDeleteRowsEvent"
-	case WriteRowsEventTypeV1:
+	case OldWriteRowsEventType:
 		return "WriteRowsEventV1"
-	case UpdateRowsEventTypeV1:
+	case OldUpdateRowsEventType:
 		return "UpdateRowsEventV1"
-	case DeleteRowsEventTypeV1:
+	case OldDeleteRowsEventType:
 		return "DeleteRowsEventV1"
 	case IncidentEventType:
 		return "IncidentEvent"
@@ -108,11 +108,11 @@ func (t EventType) String() string {
 		return "IgnorableEvent"
 	case RowsQueryEventType:
 		return "RowsQueryEvent"
-	case WriteRowsEventTypeV2:
+	case WriteRowsEventType:
 		return "WriteRowsEventV2"
-	case UpdateRowsEventTypeV2:
+	case UpdateRowsEventType:
 		return "UpdateRowsEventV2"
-	case DeleteRowsEventTypeV2:
+	case DeleteRowsEventType:
 		return "DeleteRowsEventV2"
 	case GtidEventType:
 		return "GtidEvent"

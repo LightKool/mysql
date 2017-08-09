@@ -15,8 +15,8 @@ type binlogPacket struct {
 	*mysql.Packet
 }
 
-func newBinlogPacket(packet *mysql.Packet) *binlogPacket {
-	return &binlogPacket{packet}
+func newBinlogPacket(data []byte) *binlogPacket {
+	return &binlogPacket{mysql.NewPacket(data)}
 }
 
 func (p *binlogPacket) readByte() byte {
@@ -178,9 +178,17 @@ func (p *binlogPacket) readTableColumnValue(columnType byte, meta uint16, unsign
 		}
 	case fieldTypeSet:
 		if length >= 0 && length <= 8 {
-			v = int64(p.ReadUintBySize(length))
+			v = int64(p.ReadUintBySizeBE(length))
 		} else {
 			err = fmt.Errorf("Unknown SET pack length: %d", length)
+		}
+	case fieldTypeBit:
+		nbits := (meta>>8)*8 + meta&0xFF
+		length = (int(nbits) + 7) / 8
+		if length >= 0 && length <= 8 {
+			v = int64(p.ReadUintBySizeBE(length))
+		} else {
+			err = fmt.Errorf("Unknown BIT pack length: %d", length)
 		}
 	case fieldTypeBLOB, fieldTypeGeometry: // MySQL saves Geometry as Blob in binlog
 		length = int(meta)

@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"os"
 )
 
 type TableMapEvent struct {
@@ -148,20 +147,12 @@ type WriteRowsEvent struct {
 }
 
 func (e *WriteRowsEvent) Decode(dec *EventDecoder) error {
-	// debug
-	defer func() {
-		r := recover()
-		if r != nil {
-			e.Print(os.Stdout)
-			panic(r)
-		}
-	}()
 	packet := e.header.packet
 	e.decodePartial(packet)
 	e.Table = dec.tables[e.TableID]
-	// for !packet.EOF() {
-	e.decodeOneRow(packet, e.Columns)
-	// }
+	for !packet.EOF() {
+		e.decodeOneRow(packet, e.Columns)
+	}
 	return nil
 }
 
@@ -181,4 +172,23 @@ type UpdateRowsEvent struct {
 	*baseEvent
 	rowsEvent
 	UpdatedColumns []byte
+}
+
+func (e *UpdateRowsEvent) Decode(dec *EventDecoder) error {
+	packet := e.header.packet
+	e.decodePartial(packet)
+	e.Table = dec.tables[e.TableID]
+	e.UpdatedColumns = packet.Read(int(e.ColumnCount+7) >> 3)
+	for !packet.EOF() {
+		e.decodeOneRow(packet, e.Columns)
+		e.decodeOneRow(packet, e.UpdatedColumns)
+	}
+	return nil
+}
+
+func (e *UpdateRowsEvent) Print(w io.Writer) {
+	e.printHeader(w)
+	e.printPartial(w)
+	fmt.Fprintf(w, "Rows: %v\n", e.Rows)
+	fmt.Fprintln(w)
 }

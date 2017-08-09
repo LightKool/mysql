@@ -12,6 +12,10 @@ type Packet struct {
 	pos  int
 }
 
+func NewPacket(data []byte) *Packet {
+	return &Packet{data: data}
+}
+
 func (p *Packet) Raw() []byte {
 	return p.data
 }
@@ -148,7 +152,7 @@ func (cw *ConnWrapper) ReadOK() error {
 }
 
 // ReadPacket read returned data from the MySQL server.
-func (cw *ConnWrapper) ReadPacket() (*Packet, error) {
+func (cw *ConnWrapper) ReadPacket() ([]byte, error) {
 	data, err := cw.readPacket()
 	if err != nil {
 		return nil, err
@@ -161,7 +165,7 @@ func (cw *ConnWrapper) ReadPacket() (*Packet, error) {
 	default:
 		buf := make([]byte, len(data)-1)
 		copy(buf, data[1:])
-		return &Packet{data: buf}, nil
+		return buf, nil
 	}
 }
 

@@ -1,44 +1,42 @@
 package binlog
 
-import (
-	"github.com/LightKool/mysql-go"
-)
-
 type EventDecoder struct {
 	format *FormatDescriptionEvent
 	tables map[uint64]*TableMapEvent
 }
 
-func (dec *EventDecoder) Decode(packet *mysql.Packet) (Event, error) {
-	header := &EventHeader{packet: newBinlogPacket(packet)}
+func (dec *EventDecoder) decode(data []byte) (Event, error) {
+	header := &EventHeader{packet: newBinlogPacket(data)}
 	err := header.Decode(dec)
 	if err != nil {
 		return nil, err
 	}
 
 	var ev Event
-	base := &baseEvent{header: header}
+	be := &baseEvent{header: header}
 	if header.Type == FormatDescriptionEventType {
-		dec.format = &FormatDescriptionEvent{baseEvent: base}
+		dec.format = &FormatDescriptionEvent{baseEvent: be}
 		ev = dec.format
 	} else {
 		switch header.Type {
 		case RotateEventType:
-			ev = &RotateEvent{baseEvent: base}
+			ev = &RotateEvent{baseEvent: be}
 		case QueryEventType:
-			ev = &QueryEvent{baseEvent: base}
+			ev = &QueryEvent{baseEvent: be}
 		case XidEventType:
-			ev = &XIDEvent{baseEvent: base}
+			ev = &XIDEvent{baseEvent: be}
 		case RowsQueryEventType:
-			ev = &RowsQueryEvent{baseEvent: base}
+			ev = &RowsQueryEvent{baseEvent: be}
 		case GtidEventType:
-			ev = &GtidEvent{baseEvent: base}
+			ev = &GtidEvent{baseEvent: be}
 		case TableMapEventType:
-			ev = &TableMapEvent{baseEvent: base}
-		case WriteRowsEventTypeV2:
-			ev = &WriteRowsEvent{baseEvent: base}
+			ev = &TableMapEvent{baseEvent: be}
+		case WriteRowsEventType:
+			ev = &WriteRowsEvent{baseEvent: be}
+		case UpdateRowsEventType:
+			ev = &UpdateRowsEvent{baseEvent: be}
 		default:
-			ev = &UnsupportedEvent{baseEvent: base}
+			ev = &UnsupportedEvent{baseEvent: be}
 		}
 	}
 
