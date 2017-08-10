@@ -31,10 +31,8 @@ func (dec *EventDecoder) decode(data []byte) (Event, error) {
 			ev = &GtidEvent{baseEvent: be}
 		case TableMapEventType:
 			ev = &TableMapEvent{baseEvent: be}
-		case WriteRowsEventType:
-			ev = &WriteRowsEvent{baseEvent: be}
-		case UpdateRowsEventType:
-			ev = &UpdateRowsEvent{baseEvent: be}
+		case WriteRowsEventType, UpdateRowsEventType:
+			ev = &RowsEvent{baseEvent: be}
 		default:
 			ev = &UnsupportedEvent{baseEvent: be}
 		}
@@ -42,6 +40,10 @@ func (dec *EventDecoder) decode(data []byte) (Event, error) {
 
 	if err = ev.Decode(dec); err != nil {
 		return nil, err
+	}
+
+	if e, ok := ev.(*TableMapEvent); ok {
+		dec.tables[e.TableID] = e
 	}
 
 	return ev, nil

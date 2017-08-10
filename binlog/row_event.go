@@ -44,8 +44,6 @@ func (e *TableMapEvent) Decode(dec *EventDecoder) error {
 	if len(e.ColumnNullability) != int(e.ColumnCount+7)>>3 {
 		return io.ErrUnexpectedEOF
 	}
-	// update the tables cache inside the EventDecoder
-	dec.tables[e.TableID] = e
 	return nil
 }
 
@@ -80,21 +78,23 @@ func (e *RowsQueryEvent) Print(w io.Writer) {
 	fmt.Fprintln(w)
 }
 
-type rowsEvent struct {
-	Table       *TableMapEvent
-	TableID     uint64
-	Flags       uint16
-	ExtraData   []byte
-	ColumnCount uint64
-	Columns     []byte
-	Rows        [][]interface{}
-
-	parseTime bool
+type RowsEvent struct {
+	*baseEvent
+	TableID        uint64
+	Table          *TableMapEvent
+	Flags          uint16
+	ExtraData      []byte
+	ColumnCount    uint64
+	Columns        []byte
+	UpdatedColumns []byte
+	Rows           [][]interface{}
 }
 
-func (e *rowsEvent) decodePartial(packet *binlogPacket) {
-	tableID := append(packet.Read(6), 0x00, 0x00)
-	e.TableID = binary.LittleEndian.Uint64(tableID)
+func (e *RowsEvent) Decode(dec *EventDecoder) error {
+	packet := e.header.packet
+
+	e.TableID = packet.ReadUintBySize(6)
+	e.Table = dec.tables[e.TableID]
 	e.Flags = packet.readUint16() // reserved
 
 	extraDataLen := packet.readUint16()
@@ -102,19 +102,35 @@ func (e *rowsEvent) decodePartial(packet *binlogPacket) {
 
 	e.ColumnCount = packet.ReadPackedInteger()
 	e.Columns = packet.Read(int(e.ColumnCount+7) >> 3)
+	if e.header.Type == UpdateRowsEventType {
+		e.UpdatedColumns = packet.Read(int(e.ColumnCount+7) >> 3)
+	}
+
 	e.Rows = make([][]interface{}, 0)
+	for !packet.EOF() {
+		e.decodeOneRow(e.Columns)
+		if e.header.Type == UpdateRowsEventType {
+			e.decodeOneRow(e.UpdatedColumns)
+		}
+	}
+	return nil
 }
 
-func (e *rowsEvent) printPartial(w io.Writer) {
+func (e *RowsEvent) Print(w io.Writer) {
+	e.printHeader(w)
 	fmt.Fprintf(w, "TableID: %d\n", e.TableID)
 	fmt.Fprintf(w, "Table: %s.%s\n", e.Table.Database, e.Table.TableName)
 	fmt.Fprintf(w, "Flags: %d\n", e.Flags)
 	fmt.Fprintf(w, "Column count: %d\n", e.ColumnCount)
 	fmt.Fprintf(w, "Columns: %v\n", e.Columns)
 	fmt.Fprintf(w, "Column types: \n%v\n", e.Table.ColumnTypes)
+	fmt.Fprintf(w, "Rows: %v\n", e.Rows)
+	fmt.Fprintln(w)
 }
 
-func (e *rowsEvent) decodeOneRow(packet *binlogPacket, includedColumns []byte) (err error) {
+func (e *RowsEvent) decodeOneRow(includedColumns []byte) (err error) {
+	packet := e.header.packet
+
 	var includedColumnsCount int
 	for i := 0; i < int(e.ColumnCount); i++ {
 		if isBitSet(includedColumns, i) {
@@ -139,56 +155,4 @@ func (e *rowsEvent) decodeOneRow(packet *binlogPacket, includedColumns []byte) (
 	}
 	e.Rows = append(e.Rows, row)
 	return
-}
-
-type WriteRowsEvent struct {
-	*baseEvent
-	rowsEvent
-}
-
-func (e *WriteRowsEvent) Decode(dec *EventDecoder) error {
-	packet := e.header.packet
-	e.decodePartial(packet)
-	e.Table = dec.tables[e.TableID]
-	for !packet.EOF() {
-		e.decodeOneRow(packet, e.Columns)
-	}
-	return nil
-}
-
-func (e *WriteRowsEvent) Print(w io.Writer) {
-	e.printHeader(w)
-	e.printPartial(w)
-	fmt.Fprintf(w, "Rows: %v\n", e.Rows)
-	fmt.Fprintln(w)
-}
-
-type DeleteRowsEvent struct {
-	*baseEvent
-	rowsEvent
-}
-
-type UpdateRowsEvent struct {
-	*baseEvent
-	rowsEvent
-	UpdatedColumns []byte
-}
-
-func (e *UpdateRowsEvent) Decode(dec *EventDecoder) error {
-	packet := e.header.packet
-	e.decodePartial(packet)
-	e.Table = dec.tables[e.TableID]
-	e.UpdatedColumns = packet.Read(int(e.ColumnCount+7) >> 3)
-	for !packet.EOF() {
-		e.decodeOneRow(packet, e.Columns)
-		e.decodeOneRow(packet, e.UpdatedColumns)
-	}
-	return nil
-}
-
-func (e *UpdateRowsEvent) Print(w io.Writer) {
-	e.printHeader(w)
-	e.printPartial(w)
-	fmt.Fprintf(w, "Rows: %v\n", e.Rows)
-	fmt.Fprintln(w)
 }

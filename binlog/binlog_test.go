@@ -1,6 +1,7 @@
 package binlog
 
 import (
+	"database/sql"
 	"os"
 	"testing"
 
@@ -50,9 +51,7 @@ func TestDriver(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if ev.Header().Type == QueryEventType {
-			ev.Print(os.Stdout)
-		}
+		ev.Print(os.Stdout)
 	}
 }
 
@@ -65,4 +64,16 @@ func TestMysqlVersion(t *testing.T) {
 func TestBitSet(t *testing.T) {
 	bitmap := []byte{252, 7}
 	t.Log(bitmap[1>>3]&(1<<(1&7)) > 0)
+}
+
+func TestColumn(t *testing.T) {
+	dsn := "root:abcd1234@tcp(10.17.5.91:3306)/information_schema"
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, _ := retrieveColumns(db, "test", "test_liuqi")
+	for _, col := range cols {
+		t.Logf("%#v", col)
+	}
 }

@@ -68,8 +68,8 @@ func (e *baseEvent) Header() *EventHeader {
 func (e *baseEvent) printHeader(w io.Writer) {
 	fmt.Fprintf(w, "=== %s ===\n", e.header.Type)
 	fmt.Fprintf(w, "Date: %s\n", time.Unix(int64(e.header.Timestamp), 0).Format(dateTimeFormat))
-	fmt.Fprintf(w, "Log position: %d\n", e.header.NextLogPos)
-	fmt.Fprintf(w, "Event size: %d\n", e.header.EventSize-eventHeaderSize)
+	fmt.Fprintf(w, "Next log position: %d\n", e.header.NextLogPos)
+	fmt.Fprintf(w, "Event body size: %d\n", e.header.EventSize-eventHeaderSize)
 }
 
 type UnsupportedEvent struct {

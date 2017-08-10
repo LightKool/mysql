@@ -1,9 +1,8 @@
-package internal
+package binlog
 
 import "database/sql"
 
-// Column information retrieved from MySQL's information_schema.
-type Column struct {
+type column struct {
 	name     string
 	charset  string
 	primary  bool
@@ -19,37 +18,37 @@ SELECT
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?;`
 
-func RetrieveColumns(db *sql.DB, database string, table string) ([]*Column, error) {
+func retrieveColumns(db *sql.DB, database string, table string) ([]*column, error) {
 	rows, err := db.Query(retrieveColumnsSQL, database, table)
 	if err != nil {
 		return nil, err
 	}
 
-	columns := make([]*Column, 0)
+	cols := make([]*column, 0)
 	for rows.Next() {
-		var column Column
-		rows.Scan(&column.name, &column.charset, &column.primary, &column.unsigned)
-		columns = append(columns, &column)
+		var col column
+		rows.Scan(&col.name, &col.charset, &col.primary, &col.unsigned)
+		cols = append(cols, &col)
 	}
-	return columns, nil
+	return cols, nil
 }
 
 // Name returns the column name.
-func (col *Column) Name() string {
+func (col *column) Name() string {
 	return col.name
 }
 
 // Charset returns the column character set.
-func (col *Column) Charset() string {
+func (col *column) Charset() string {
 	return col.charset
 }
 
 // IsPrimary returns if this column is a part of the primary key.
-func (col *Column) IsPrimary() bool {
+func (col *column) IsPrimary() bool {
 	return col.primary
 }
 
 // IsUnsigned returns if the type of this column is an unsigned number.
-func (col *Column) IsUnsigned() bool {
+func (col *column) IsUnsigned() bool {
 	return col.unsigned
 }
