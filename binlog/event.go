@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"time"
-
-	"github.com/juju/errors"
 )
 
 const (
@@ -39,7 +37,7 @@ type EventHeader struct {
 func (h *EventHeader) Decode(dec *EventDecoder) error {
 	packet := h.packet
 	if packet.Len() < eventHeaderSize {
-		return errors.Errorf("event header size %d too short, expect %d", packet.Len(), eventHeaderSize)
+		return fmt.Errorf("event header size %d too short, expect %d", packet.Len(), eventHeaderSize)
 	}
 	h.Timestamp = packet.readUint32()
 	h.Type = EventType(packet.readByte())
@@ -48,7 +46,7 @@ func (h *EventHeader) Decode(dec *EventDecoder) error {
 	h.NextLogPos = packet.readUint32()
 	h.Flags = packet.readUint16()
 	if packet.Len() != int(h.EventSize) {
-		return errors.Errorf("header event size: %d != actual event size: %d, maybe corrupted", h.EventSize, packet.Len())
+		return fmt.Errorf("header event size: %d != actual event size: %d, maybe corrupted", h.EventSize, packet.Len())
 	}
 	// remove checksum part if the event type is not FormatDescriptionEventType
 	if h.Type != FormatDescriptionEventType && dec.format != nil && dec.format.checksumEnabled() {
@@ -102,6 +100,12 @@ func (e *RotateEvent) Decode(dec *EventDecoder) error {
 	return nil
 }
 
+func (e *RotateEvent) postDecode(dec *EventDecoder) error {
+	// Refer to https://github.com/noplay/python-mysql-replication/blob/master/pymysqlreplication/binlogstream.py (lint 435)
+	dec.tables = make(map[uint64]*TableMapEvent)
+	return nil
+}
+
 func (e *RotateEvent) Print(w io.Writer) {
 	e.printHeader(w)
 	fmt.Fprintf(w, "Position: %d\n", e.Position)
@@ -134,6 +138,11 @@ func (e *FormatDescriptionEvent) Decode(dec *EventDecoder) error {
 		e.checksumAlg = checksumPart[0]
 	}
 	e.EventPostHeaderLengths = packet.Read(-1)
+	return nil
+}
+
+func (e *FormatDescriptionEvent) postDecode(dec *EventDecoder) error {
+	dec.format = e
 	return nil
 }
 

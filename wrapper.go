@@ -3,7 +3,6 @@ package mysql
 import (
 	"database/sql/driver"
 	"encoding/binary"
-	"errors"
 	"io"
 )
 
@@ -126,13 +125,8 @@ type ConnWrapper struct {
 }
 
 // NewConnWrapper create a new `mysql.ConnWrapper` instance.
-// Takes the mysql Driver as the sole argument.
-func NewConnWrapper(drv driver.Driver) (*ConnWrapper, error) {
-	drv, ok := drv.(*MySQLDriver)
-	if !ok {
-		return nil, errors.New("unsupported sql driver")
-	}
-	return &ConnWrapper{drv: drv}, nil
+func NewConnWrapper() *ConnWrapper {
+	return &ConnWrapper{drv: &MySQLDriver{}}
 }
 
 // Connect to the MySQL server.

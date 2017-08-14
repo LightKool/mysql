@@ -14,37 +14,41 @@ func (dec *EventDecoder) decode(data []byte) (Event, error) {
 
 	var ev Event
 	be := &baseEvent{header: header}
-	if header.Type == FormatDescriptionEventType {
-		dec.format = &FormatDescriptionEvent{baseEvent: be}
-		ev = dec.format
-	} else {
-		switch header.Type {
-		case RotateEventType:
-			ev = &RotateEvent{baseEvent: be}
-		case QueryEventType:
-			ev = &QueryEvent{baseEvent: be}
-		case XidEventType:
-			ev = &XIDEvent{baseEvent: be}
-		case RowsQueryEventType:
-			ev = &RowsQueryEvent{baseEvent: be}
-		case GtidEventType:
-			ev = &GtidEvent{baseEvent: be}
-		case TableMapEventType:
-			ev = &TableMapEvent{baseEvent: be}
-		case WriteRowsEventType, UpdateRowsEventType:
-			ev = &RowsEvent{baseEvent: be}
-		default:
-			ev = &UnsupportedEvent{baseEvent: be}
-		}
+	switch header.Type {
+	case FormatDescriptionEventType:
+		ev = &FormatDescriptionEvent{baseEvent: be}
+	case RotateEventType:
+		ev = &RotateEvent{baseEvent: be}
+	case QueryEventType:
+		ev = &QueryEvent{baseEvent: be}
+	case XidEventType:
+		ev = &XIDEvent{baseEvent: be}
+	case RowsQueryEventType:
+		ev = &RowsQueryEvent{baseEvent: be}
+	case GtidEventType:
+		ev = &GtidEvent{baseEvent: be}
+	case TableMapEventType:
+		ev = &TableMapEvent{baseEvent: be}
+	case WriteRowsEventType, UpdateRowsEventType, DeleteRowsEventType:
+		ev = &RowsEvent{baseEvent: be}
+	default:
+		ev = &UnsupportedEvent{baseEvent: be}
 	}
 
 	if err = ev.Decode(dec); err != nil {
 		return nil, err
 	}
 
-	if e, ok := ev.(*TableMapEvent); ok {
-		dec.tables[e.TableID] = e
+	if pd, ok := ev.(postDecoder); ok {
+		err = pd.postDecode(dec)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return ev, nil
+}
+
+type postDecoder interface {
+	postDecode(*EventDecoder) error
 }

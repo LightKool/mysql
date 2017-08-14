@@ -47,6 +47,11 @@ func (e *TableMapEvent) Decode(dec *EventDecoder) error {
 	return nil
 }
 
+func (e *TableMapEvent) postDecode(dec *EventDecoder) error {
+	dec.tables[e.TableID] = e
+	return nil
+}
+
 func (e *TableMapEvent) Print(w io.Writer) {
 	e.printHeader(w)
 	fmt.Fprintf(w, "TableID: %d\n", e.TableID)
@@ -116,18 +121,6 @@ func (e *RowsEvent) Decode(dec *EventDecoder) error {
 	return nil
 }
 
-func (e *RowsEvent) Print(w io.Writer) {
-	e.printHeader(w)
-	fmt.Fprintf(w, "TableID: %d\n", e.TableID)
-	fmt.Fprintf(w, "Table: %s.%s\n", e.Table.Database, e.Table.TableName)
-	fmt.Fprintf(w, "Flags: %d\n", e.Flags)
-	fmt.Fprintf(w, "Column count: %d\n", e.ColumnCount)
-	fmt.Fprintf(w, "Columns: %v\n", e.Columns)
-	fmt.Fprintf(w, "Column types: \n%v\n", e.Table.ColumnTypes)
-	fmt.Fprintf(w, "Rows: %v\n", e.Rows)
-	fmt.Fprintln(w)
-}
-
 func (e *RowsEvent) decodeOneRow(includedColumns []byte) (err error) {
 	packet := e.header.packet
 
@@ -147,7 +140,7 @@ func (e *RowsEvent) decodeOneRow(includedColumns []byte) (err error) {
 		}
 		index = i - skipped
 		if !isBitSet(nullColumns, index) {
-			row[index], err = packet.readTableColumnValue(e.Table.ColumnTypes[i], e.Table.ColumnMeta[i], false)
+			row[index], err = packet.readTableColumnValue(e.Table.ColumnTypes[i], e.Table.ColumnMeta[i])
 			if err != nil {
 				return
 			}
@@ -155,4 +148,22 @@ func (e *RowsEvent) decodeOneRow(includedColumns []byte) (err error) {
 	}
 	e.Rows = append(e.Rows, row)
 	return
+}
+
+func (e *RowsEvent) Print(w io.Writer) {
+	e.printHeader(w)
+	fmt.Fprintf(w, "TableID: %d\n", e.TableID)
+	fmt.Fprintf(w, "Table: %s.%s\n", e.Table.Database, e.Table.TableName)
+	fmt.Fprintf(w, "Flags: %d\n", e.Flags)
+	fmt.Fprintf(w, "Column count: %d\n", e.ColumnCount)
+	fmt.Fprintf(w, "Columns: %v\n", e.Columns)
+	e.printRows(w)
+	fmt.Fprintln(w)
+}
+
+func (e *RowsEvent) printRows(w io.Writer) {
+	fmt.Fprintln(w, "Rows:")
+	for _, row := range e.Rows {
+		fmt.Fprintf(w, "%v\n", row)
+	}
 }

@@ -1,18 +1,15 @@
 package binlog
 
 import (
-	"database/sql"
 	"os"
 	"testing"
 
 	"github.com/LightKool/mysql-go"
-	"github.com/juju/errors"
 )
 
 func TestDriver(t *testing.T) {
-	driver := &mysql.MySQLDriver{}
 	dsn := "root:abcd1234@tcp(10.17.5.91:3306)/user_mon"
-	wr, _ := mysql.NewConnWrapper(driver)
+	wr := mysql.NewConnWrapper()
 	err := wr.Connect(dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +30,7 @@ func TestDriver(t *testing.T) {
 		t.Fatal(err)
 	}
 	// err = wr.WriteBinlogDumpCommand(123, "mysql-bin.000004", 4)
-	err = wr.WriteBinlogDumpCommand(123, "mysql-bin.000005", 4)
+	err = wr.WriteBinlogDumpCommand(123, "mysql-bin.000005", 28617898)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +40,7 @@ func TestDriver(t *testing.T) {
 	for {
 		packet, err := wr.ReadPacket()
 		if err != nil {
-			t.Fatal(errors.Trace(err))
+			t.Fatal(err)
 		}
 
 		ev, err := dec.decode(packet)
@@ -64,16 +61,4 @@ func TestMysqlVersion(t *testing.T) {
 func TestBitSet(t *testing.T) {
 	bitmap := []byte{252, 7}
 	t.Log(bitmap[1>>3]&(1<<(1&7)) > 0)
-}
-
-func TestColumn(t *testing.T) {
-	dsn := "root:abcd1234@tcp(10.17.5.91:3306)/information_schema"
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cols, _ := retrieveColumns(db, "test", "test_liuqi")
-	for _, col := range cols {
-		t.Logf("%#v", col)
-	}
 }

@@ -72,63 +72,39 @@ func (p *binlogPacket) readTableColumnMeta(columnTypes []byte) ([]uint16, error)
 	return meta, nil
 }
 
-func (p *binlogPacket) readTableColumnValue(columnType byte, meta uint16, unsigned bool) (v interface{}, err error) {
+func (p *binlogPacket) readTableColumnValue(typ byte, meta uint16) (v interface{}, err error) {
 	var length int
-	if columnType == fieldTypeString {
+	if typ == fieldTypeString {
 		if meta >= 256 {
 			realType := byte(meta >> 8)
 			if realType&0x30 != 0x30 {
 				length = int(uint16(meta&0xFF) | uint16((realType&0x30)^0x30)<<4)
-				columnType = realType | 0x30
+				typ = realType | 0x30
 			} else {
 				length = int(meta & 0xFF)
-				columnType = realType
+				typ = realType
 			}
 		} else {
 			length = int(meta)
 		}
 	}
 
-	switch columnType {
+	switch typ {
 	case fieldTypeTiny:
 		b := p.readByte()
-		if unsigned {
-			v = int64(b)
-		} else {
-			v = int64(int8(b))
-		}
+		v = int64(b)
 	case fieldTypeShort:
-		if unsigned {
-			v = int64(p.readUint16())
-		} else {
-			v = int64(int16(p.readUint16()))
-		}
+		v = int64(p.readUint16())
 	case fieldTypeInt24:
-		if unsigned {
-			v = int64(p.readUint24())
-		} else {
-			u32 := p.readUint24()
-			if u32 >= 0x800000 {
-				u32 = ^u32 + 1 // 2's compliment
-			}
-			v = int64(u32)
-		}
+		v = int64(p.readUint24())
 	case fieldTypeLong:
-		if unsigned {
-			v = int64(p.readUint32())
-		} else {
-			v = int64(int32(p.readUint32()))
-		}
+		v = int64(p.readUint32())
 	case fieldTypeLongLong:
-		if unsigned {
-			u64 := p.readUint64()
-			if u64 > math.MaxInt64 {
-				v = fmt.Sprintln(u64)
-			} else {
-				v = int64(u64)
-			}
+		u64 := p.readUint64()
+		if u64 > math.MaxInt64 {
+			v = fmt.Sprintln(u64)
 		} else {
-			v = int64(p.readUint64())
+			v = int64(u64)
 		}
 	case fieldTypeFloat:
 		v = math.Float32frombits(p.readUint32())
