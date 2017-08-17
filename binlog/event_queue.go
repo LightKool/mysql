@@ -11,6 +11,10 @@ type EventQueue struct {
 }
 
 func (q *EventQueue) Pop(ctx context.Context) (Event, error) {
+	if q.err != nil {
+		return nil, q.err
+	}
+
 	select {
 	case event := <-q.ch:
 		return event, nil

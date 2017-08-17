@@ -172,6 +172,9 @@ func (p *binlogPacket) readTableColumnValue(typ byte, meta uint16) (v interface{
 		v = p.Read(int(blobLen))
 	case fieldTypeJSON:
 		// TODO
+		length = int(meta)
+		blobLen := p.ReadUintBySize(length)
+		v = p.Read(int(blobLen))
 	}
 	return
 }
@@ -198,26 +201,24 @@ func (p *binlogPacket) readNewDecimal(meta uint16) (float64, error) {
 	}
 	data[0] ^= 0x80 // remove the sign bit
 
-	var length, pos int
+	var length int
+	packet := mysql.NewPacket(data)
 	// compressed integer part
 	length = compressedBytes[intgx]
-	buf.WriteString(fmt.Sprintf("%d", binary.BigEndian.Uint32(append(make([]byte, 4-length), data[pos:pos+length]...))))
-	pos += length
+	buf.WriteString(fmt.Sprintf("%d", packet.ReadUintBySizeBE(length)))
 	// uncompressed integer part
 	for i := 0; i < intg; i++ {
-		buf.WriteString(fmt.Sprintf("%09d", binary.BigEndian.Uint32(data[pos:])))
-		pos += 4
+		buf.WriteString(fmt.Sprintf("%09d", packet.ReadUintBySizeBE(4)))
 	}
 	// decimal point
 	buf.WriteString(".")
 	// uncompressed fractional part
 	for i := 0; i < frac; i++ {
-		buf.WriteString(fmt.Sprintf("%09d", binary.BigEndian.Uint32(data[pos:])))
-		pos += 4
+		buf.WriteString(fmt.Sprintf("%09d", packet.ReadUintBySizeBE(4)))
 	}
 	// compressed fractional part
 	length = compressedBytes[fracx]
-	buf.WriteString(fmt.Sprintf("%0*d", fracx, binary.BigEndian.Uint32(append(make([]byte, 4-length), data[pos:pos+length]...))))
+	buf.WriteString(fmt.Sprintf("%0*d", fracx, packet.ReadUintBySizeBE(length)))
 
 	return strconv.ParseFloat(buf.String(), 64)
 }
@@ -263,8 +264,11 @@ func (p *binlogPacket) readDateTimeV2(meta uint16) (v string) {
 	minute := datetime >> (40 - 28 - 6) & (1<<6 - 1)
 	sec := datetime >> (40 - 34 - 6) & (1<<6 - 1)
 
-	v = fmt.Sprintf("%04d-%02d-%02d %02d:%02d:%02d.%06d", year, month, day, hour, minute, sec, msec)
-	v = v[0 : len(v)-6+dec]
+	if dec > 0 {
+		v = fmt.Sprintf("%04d-%02d-%02d %02d:%02d:%02d.%0*d", year, month, day, hour, minute, sec, dec, msec)
+	} else {
+		v = fmt.Sprintf("%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, sec)
+	}
 	return
 }
 
@@ -301,7 +305,10 @@ func (p *binlogPacket) readTimeV2(meta uint16) (v string) {
 	minute := time >> (24 - 12 - 6) & (1<<6 - 1)
 	sec := time >> (24 - 18 - 6) & (1<<6 - 1)
 
-	v = fmt.Sprintf("%s%02d:%02d:%02d.%06d", sign, hour, minute, sec, msec)
-	v = v[0 : len(v)-6+dec]
+	if dec > 0 {
+		v = fmt.Sprintf("%s%02d:%02d:%02d.%0*d", sign, hour, minute, sec, dec, msec)
+	} else {
+		v = fmt.Sprintf("%s%02d:%02d:%02d", sign, hour, minute, sec)
+	}
 	return
 }
